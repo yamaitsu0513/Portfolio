@@ -24,6 +24,7 @@
 | title | text | NO | - | - | 実績のタイトル |
 | image | text | YES | - | - | 画像URL (Supabase Storage) |
 | description | text | YES | - | - | 実績の詳細説明 |
+| order_num | integer | NO | 0 | - | 表示順序 (昇順でソート、小さいほど上位) |
 | is_public | boolean | NO | false | - | 公開フラグ (true: 公開, false: 非公開) |
 | created_at | timestamptz | NO | now() | - | 作成日時 |
 | updated_at | timestamptz | NO | now() | - | 更新日時 |
@@ -34,8 +35,8 @@
 -- 主キー
 PRIMARY KEY (id)
 
--- 公開中の実績を効率的に取得
-CREATE INDEX idx_work_public ON mst_work(is_public, created_at DESC) WHERE deleted_at IS NULL;
+-- 公開中の実績を表示順でソート
+CREATE INDEX idx_work_public_order ON mst_work(order_num ASC, created_at DESC) WHERE is_public = true AND deleted_at IS NULL;
 
 -- 論理削除されていないレコードを取得
 CREATE INDEX idx_work_deleted ON mst_work(deleted_at) WHERE deleted_at IS NULL;
