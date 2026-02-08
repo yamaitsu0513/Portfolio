@@ -1,0 +1,505 @@
+openapi: 3.0.3
+info:
+  title: ポートフォリオサイト API
+  description: |
+    ポートフォリオサイトのバックエンドAPI仕様書
+
+    ## 認証
+    すべてのリクエストに以下のヘッダーが必要です。
+    - `apikey`: Supabase Anon Key
+    - `Authorization`: Bearer形式でSupabase Anon Key
+  version: 1.0.0
+  contact:
+    name: API Support
+servers:
+  - url: https://rqkwsjwvmnoozsfpupnt.supabase.co
+    description: Production server
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+tags:
+  - name: Works
+    description: 実績データ関連
+  - name: Contact
+    description: 問い合わせ関連
+  - name: Email
+    description: メール送信関連
+
+paths:
+  /rest/v1/mst_work:
+    get:
+      tags:
+        - Works
+      summary: 実績データ取得
+      description: |
+        公開されている実績データを取得します。
+        PostgREST Auto-generated APIを使用しています。
+      operationId: getWorks
+      parameters:
+        - name: select
+          in: query
+          description: 取得するカラムを指定 (例 id,title,image)
+          required: false
+          schema:
+            type: string
+            example: "*"
+        - name: is_public
+          in: query
+          description: 公開フラグでフィルタ
+          required: false
+          schema:
+            type: string
+            example: "eq.true"
+        - name: deleted_at
+          in: query
+          description: 削除フラグでフィルタ
+          required: false
+          schema:
+            type: string
+            example: "is.null"
+        - name: order
+          in: query
+          description: |
+            ソート順を指定
+            - `order_num.asc` - 表示順序の昇順(推奨)
+            - `order_num.asc,created_at.desc` - 表示順序の昇順、同じ場合は作成日の降順
+            - `created_at.desc` - 作成日の降順
+          required: false
+          schema:
+            type: string
+            example: "order_num.asc,created_at.desc"
+        - name: limit
+          in: query
+          description: 取得件数の制限
+          required: false
+          schema:
+            type: integer
+            example: 10
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Work'
+              examples:
+                success:
+                  value:
+                    - id: "123e4567-e89b-12d3-a456-426614174000"
+                      title: "ECサイト構築プロジェクト"
+                      image: "https://rqkwsjwvmnoozsfpupnt.supabase.co/storage/v1/object/public/works/sample.jpg"
+                      description: "Reactを使用したECサイトの開発"
+                      order_num: 1
+                      is_public: true
+                      created_at: "2025-01-15T10:00:00.000Z"
+                      updated_at: "2025-01-15T10:00:00.000Z"
+                      deleted_at: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /rest/v1/rpc/create_contact:
+    post:
+      tags:
+        - Contact
+      summary: 問い合わせデータ作成
+      description: |
+        問い合わせフォームから送信されたデータをデータベースに保存します。
+        PostgreSQL RPCファンクションを使用しています。
+      operationId: createContact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_user_name
+                - p_email
+                - p_content
+              properties:
+                p_user_name:
+                  type: string
+                  description: 問い合わせ者名
+                  example: "山田太郎"
+                p_email:
+                  type: string
+                  format: email
+                  description: メールアドレス
+                  example: "yamada@example.com"
+                p_content:
+                  type: string
+                  description: 問い合わせ内容
+                  example: "ポートフォリオサイトについての問い合わせです"
+                p_description:
+                  type: string
+                  nullable: true
+                  description: 補足説明
+                  example: "制作期間について詳しく知りたいです"
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactResponse'
+              examples:
+                success:
+                  value:
+                    id: "456e7890-e89b-12d3-a456-426614174001"
+                    user_name: "山田太郎"
+                    email: "yamada@example.com"
+                    content: "ポートフォリオサイトについての問い合わせです"
+                    description: "制作期間について詳しく知りたいです"
+                    created_at: "2025-02-07T12:00:00.000Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /functions/v1/send_email_contact_admin:
+    post:
+      tags:
+        - Email
+      summary: 運営への問い合わせメール送信
+      description: |
+        問い合わせ内容を運営者(管理者)にメールで通知します。
+        Supabase Edge Functionを使用しています。
+      operationId: sendEmailToAdmin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_to
+                - user_name
+                - user_email
+                - content
+              properties:
+                p_to:
+                  type: string
+                  format: email
+                  description: 運営者のメールアドレス
+                  example: "admin@example.com"
+                user_name:
+                  type: string
+                  description: 問い合わせ者名
+                  example: "山田太郎"
+                user_email:
+                  type: string
+                  format: email
+                  description: 問い合わせ者のメールアドレス
+                  example: "yamada@example.com"
+                content:
+                  type: string
+                  description: 問い合わせ内容
+                  example: "ポートフォリオサイトについての問い合わせです"
+                description:
+                  type: string
+                  nullable: true
+                  description: 補足説明
+                  example: "制作期間について詳しく知りたいです"
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailSuccessResponse'
+              examples:
+                success:
+                  value:
+                    success: true
+                    message: "管理者へのメール送信が完了しました"
+                    messageId: "msg_abc123xyz"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: メール送信エラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailErrorResponse'
+              examples:
+                error:
+                  value:
+                    success: false
+                    error: "メール送信に失敗しました"
+                    details: "SendGrid API error: Invalid API key"
+
+  /functions/v1/send_email_contact_user:
+    post:
+      tags:
+        - Email
+      summary: ユーザーへの問い合わせ完了メール送信
+      description: |
+        問い合わせを送信したユーザーに自動返信メールを送信します。
+        Supabase Edge Functionを使用しています。
+      operationId: sendEmailToUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - p_to
+                - user_name
+              properties:
+                p_to:
+                  type: string
+                  format: email
+                  description: 問い合わせ者のメールアドレス
+                  example: "yamada@example.com"
+                user_name:
+                  type: string
+                  description: 問い合わせ者名
+                  example: "山田太郎"
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailSuccessResponse'
+              examples:
+                success:
+                  value:
+                    success: true
+                    message: "ユーザーへの確認メール送信が完了しました"
+                    messageId: "msg_def456uvw"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: メール送信エラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailErrorResponse'
+              examples:
+                error:
+                  value:
+                    success: false
+                    error: "メール送信に失敗しました"
+                    details: "Invalid email address"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: apikey
+      description: Supabase Anon Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer形式でSupabase Anon Keyを指定
+
+  schemas:
+    Work:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 実績ID
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        title:
+          type: string
+          description: 実績タイトル
+          example: "ECサイト構築プロジェクト"
+        image:
+          type: string
+          nullable: true
+          format: uri
+          description: 実績画像URL
+          example: "https://rqkwsjwvmnoozsfpupnt.supabase.co/storage/v1/object/public/works/sample.jpg"
+        description:
+          type: string
+          nullable: true
+          description: 実績の説明
+          example: "Reactを使用したECサイトの開発"
+        order_num:
+          type: integer
+          description: 表示順序
+          example: 1
+        is_public:
+          type: boolean
+          description: 公開フラグ
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          description: 作成日時
+          example: "2025-01-15T10:00:00.000Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: 更新日時
+          example: "2025-01-15T10:00:00.000Z"
+        deleted_at:
+          type: string
+          nullable: true
+          format: date-time
+          description: 削除日時
+          example: null
+
+    ContactResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 問い合わせID
+          example: "456e7890-e89b-12d3-a456-426614174001"
+        user_name:
+          type: string
+          description: 問い合わせ者名
+          example: "山田太郎"
+        email:
+          type: string
+          format: email
+          description: メールアドレス
+          example: "yamada@example.com"
+        content:
+          type: string
+          description: 問い合わせ内容
+          example: "ポートフォリオサイトについての問い合わせです"
+        description:
+          type: string
+          nullable: true
+          description: 補足説明
+          example: "制作期間について詳しく知りたいです"
+        created_at:
+          type: string
+          format: date-time
+          description: 作成日時
+          example: "2025-02-07T12:00:00.000Z"
+
+    EmailSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: 成功フラグ
+          example: true
+        message:
+          type: string
+          description: 結果メッセージ
+          example: "メール送信が完了しました"
+        messageId:
+          type: string
+          description: メッセージID
+          example: "msg_abc123xyz"
+
+    EmailErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: 成功フラグ
+          example: false
+        error:
+          type: string
+          description: エラーメッセージ
+          example: "メール送信に失敗しました"
+        details:
+          type: string
+          description: 詳細なエラー情報
+          example: "SendGrid API error: Invalid API key"
+
+    PostgRESTError:
+      type: object
+      properties:
+        code:
+          type: string
+          description: PostgRESTエラーコード
+          example: "PGRST116"
+        details:
+          type: string
+          nullable: true
+          description: エラー詳細
+          example: "The result contains 0 rows"
+        hint:
+          type: string
+          nullable: true
+          description: エラーヒント
+          example: null
+        message:
+          type: string
+          description: エラーメッセージ
+          example: "JSON object requested, multiple (or no) rows returned"
+
+  responses:
+    BadRequest:
+      description: Bad Request - リクエストパラメータが不正
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgRESTError'
+          example:
+            code: "400"
+            message: "リクエストパラメータが不正です"
+            details: "パラメータの型や必須項目を確認してください"
+
+    Unauthorized:
+      description: Unauthorized - 認証エラー
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgRESTError'
+          example:
+            code: "401"
+            message: "認証エラー"
+            details: "APIキーを確認してください"
+
+    Forbidden:
+      description: Forbidden - アクセス権限なし
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgRESTError'
+          example:
+            code: "403"
+            message: "アクセス権限なし"
+            details: "RLSポリシーを確認してください"
+
+    NotFound:
+      description: Not Found - リソースが見つからない
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgRESTError'
+          example:
+            code: "404"
+            message: "リソースが見つかりません"
+            details: "エンドポイントURLを確認してください"
+
+    InternalServerError:
+      description: Internal Server Error - サーバーエラー
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgRESTError'
+          example:
+            code: "500"
+            message: "サーバーエラー"
+            details: "ログを確認し、管理者に連絡してください"
