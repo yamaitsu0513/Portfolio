@@ -12,6 +12,7 @@ erDiagram
         text title "タイトル"
         text image "画像URL"
         text description "説明"
+        integer order_num "表示順序"
         boolean is_public "公開フラグ"
         timestamptz created_at "作成日時"
         timestamptz updated_at "更新日時"
@@ -98,7 +99,7 @@ erDiagram
 ```
 1. ユーザーがポートフォリオページにアクセス
 2. mst_work から is_public=true かつ deleted_at IS NULL のレコードを取得
-3. created_at の降順でソートして表示
+3. order_num の昇順でソート(同じ場合は created_at の降順)
 4. 画像は Supabase Storage から取得
 ```
 
